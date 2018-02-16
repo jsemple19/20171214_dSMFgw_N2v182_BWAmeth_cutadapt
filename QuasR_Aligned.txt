@@ -1,0 +1,5 @@
+FileName	SampleName
+/Users/semple/Documents/MeisterLab/sequencingData/20171214_dSMFgw_N2v182_BWAmeth/aln/180126_SNK268_A_L001_JIB-1.filt.bam	N2_DE_gwV006
+/Users/semple/Documents/MeisterLab/sequencingData/20171214_dSMFgw_N2v182_BWAmeth/aln/180126_SNK268_A_L001_JIB-2.filt.bam	N2_DE_gwV007
+/Users/semple/Documents/MeisterLab/sequencingData/20171214_dSMFgw_N2v182_BWAmeth/aln/180126_SNK268_A_L001_JIB-3.filt.bam	F2_DE_gwV008
+/Users/semple/Documents/MeisterLab/sequencingData/20171214_dSMFgw_N2v182_BWAmeth/aln/180126_SNK268_A_L001_JIB-4.filt.bam	F2_DE_gwV009
