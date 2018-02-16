@@ -8,8 +8,9 @@
 
 genomefile:= ${HOME}/Documents/MeisterLab/GenomeVer/sequence/c_elegans.PRJNA13758.WS250.genomic.fa
 trimmomaticDIR := ${HOME}/Trimmomatic-0.36
+trimAdapterFile := ${trimmomaticDIR}/adapters/TruSeq_2-3_PE.fa
 methIndGenomeFiles := $(addsuffix ${genomefile}.bwameth.ct2, .sa .amb .ann .pac .bwt)
-bname :=  $(addprefix 180126_SNK268_A_L001_JIB-, 1L 2L 3L 4L)
+bname :=  $(addprefix 180126_SNK268_A_L001_JIB-, 1 2 3 4)
 longbname := $(addsuffix _R1, $(bname)) $(addsuffix _R2, $(bname))
 
 
@@ -53,7 +54,7 @@ secondaryFiles :=   $(addsuffix .sorted.bam, $(addprefix aln/, $(bname)))
 ########### RULES  ############
 ###############################
 
-all: $(statsObjects) $(objects) $(secondaryFiles)
+all:  $(objects) $(statsObjects) $(secondaryFiles)
 
 #use cleanall when you want to force rerunning all the analysis
 cleanall:
@@ -93,10 +94,12 @@ rawData/fastQC/%_fastqc.html: rawData/%.fastq.gz
 # use trimmomatic to trim
 trim/%_forward_paired.fq.gz trim/%_forward_unpaired.fq.gz trim/%_reverse_paired.fq.gz trim/%_reverse_unpaired.fq.gz: rawData/%_R1.fastq.gz rawData/%_R2.fastq.gz
 	mkdir -p trim
-	java -jar ${trimmomaticDIR}/trimmomatic-0.36.jar PE rawData/$*_R1.fastq.gz rawData/$*_R2.fastq.gz trim/$*_forward_paired.fq.gz trim/$*_forward_unpaired.fq.gz trim/$*_reverse_paired.fq.gz trim/$*_reverse_unpaired.fq.gz ILLUMINACLIP:${trimmomaticDIR}/adapters/TruSeq3-PE.fa:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36 2> trim/report_$*_trimmomatic.txt
-	# redo fastQC on trimmed reads
+	java -jar ${trimmomaticDIR}/trimmomatic-0.36.jar PE rawData/$*_R1.fastq.gz rawData/$*_R2.fastq.gz trim/$*_forward_paired.fq.gz trim/$*_forward_unpaired.fq.gz trim/$*_reverse_paired.fq.gz trim/$*_reverse_unpaired.fq.gz ILLUMINACLIP:${trimAdapterFile}:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36 2> trim/report_$*_trimmomatic.txt
+
+# redo fastQC on trimmed reads	
+trim/fastQC/%_fastqc.html: trim/%.fq.gz
 	mkdir -p trim/fastQC
-	fastqc trim/$*_forward_paired.fq.gz trim/$*_forward_unpaired.fq.gz trim/$*_reverse_paired.fq.gz trim/$*_reverse_unpaired.fq.gz -o trim/fastQC
+	fastqc $^ -o trim/fastQC
 
 
 #######################################################
@@ -129,6 +132,8 @@ aln/prefilt/report_%_flagstats.txt: aln/%.sorted.bam
 
 aln/prefilt/report_%_stats.txt: aln/%.sorted.bam
 	samtools stats $^ > $@
+	
+#samtools view -cF 0x100 accepted_hits.bam
 
 # Get insert size statistics and plots with picard and qualimap (set path to $QUALIMAP in .bash_profile)
 aln/prefilt/report_%_picard_insert_size_metrics.txt aln/prefilt/report_%_picard_insert_size_histogram.pdf \
