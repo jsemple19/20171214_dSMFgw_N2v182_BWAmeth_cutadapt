@@ -24,8 +24,8 @@ source('./R/useful_functionsV1.r') #load the ranges
 
 #####    reload project using list of bam files
 
-path='./'
-my.alignmentsDir=paste(path,'aln/',sep='')
+path='.'
+my.alignmentsDir=paste(path,'/aln/',sep='')
 
 #sp.list=read.delim( "./QuasR_Aligned.txt",sep='\t')  # delete? redundantly creares another file??
 #write.table(sp.list,'./tmp/sample_BAM.tmp',sep='\t',row.names=FALSE)
@@ -58,7 +58,7 @@ if (!dir.exists(paste0(path,"./plots"))){
 }
 
 ## save as rds for future access
-saveRDS(meth_gr,paste0(path,'/methylation_calls/NOMEamplicon_',samples,'.rds'))
+saveRDS(meth_gr,paste0(path,'/methylation_calls/NOME_allCs.rds'))
 
 # and make some histograms
 pdf("./plots/hist_C_coverage.pdf",width=8,height=11,paper="a4")
@@ -91,7 +91,7 @@ for (s in samples){
 }
 dev.off()
 
-#saveRDS(methFreq_grl,paste0(path,"/methylation_calls/NOMEamplicon_allSites.rds"))
+saveRDS(methFreq_grl,paste0(path,"/methylation_calls/NOME_CG-GC.rds"))
 
 # #######################################
 # #######################################

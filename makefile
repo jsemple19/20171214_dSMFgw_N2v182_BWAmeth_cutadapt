@@ -1,6 +1,6 @@
 #!/usr/bin/make -f
 ## mapping dSMF-gw sequences with bwa-meth
-## required software: fastqc, trimmomatic, bwa-meth, samtools, picard, qualimap
+## required software: fastqc, cutadapt, trimmomatic, bwa-meth, samtools, picard, qualimap
 
 ###############################
 ########### VARIABLES #########
@@ -13,6 +13,7 @@ methIndGenomeFiles := $(addsuffix ${genomefile}.bwameth.ct2, .sa .amb .ann .pac 
 bname :=  $(addprefix 180126_SNK268_A_L001_JIB-, 1 2 3 4)
 longbname := $(addsuffix _R1, $(bname)) $(addsuffix _R2, $(bname))
 
+#fileList=( $(cat fileList.txt) )
 
 #list of the final output files
 objects := 	${methIndGenomeFiles} \
@@ -20,6 +21,7 @@ objects := 	${methIndGenomeFiles} \
 
 #list of the various reports and stats produced during analysis
 statsObjects := $(addsuffix _fastqc.html, $(addprefix rawData/fastQC/, $(longbname))) \
+	$(addsuffix _fastqc.html, $(addprefix cutadapt/fastQC/, $(longbname))) \
 	$(addsuffix _forward_paired_fastqc.html, $(addprefix trim/fastQC/, $(bname))) \
 	$(addsuffix _forward_unpaired_fastqc.html, $(addprefix trim/fastQC/, $(bname))) \
 	$(addsuffix _reverse_paired_fastqc.html, $(addprefix trim/fastQC/, $(bname))) \
@@ -39,7 +41,8 @@ statsObjects := $(addsuffix _fastqc.html, $(addprefix rawData/fastQC/, $(longbna
 	$(addprefix aln/postfilt/report_, $(addsuffix _qualimap.pdf, $(bname))) 
 	
 #list of files to delete at the end of the analysis
-intermediateFiles := $(addsuffix _forward_paired.fq.gz, $(addprefix trim/, $(bname))) \
+intermediateFiles := $(addsuffix .fastq.gz, $(addprefix cutadapt/, $(longbname))) \
+	$(addsuffix _forward_paired.fq.gz, $(addprefix trim/, $(bname))) \
 	$(addsuffix _forward_unpaired.fq.gz, $(addprefix trim/, $(bname))) \
 	$(addsuffix _reverse_paired.fq.gz, $(addprefix trim/, $(bname))) \
 	$(addsuffix _reverse_unpaired.fq.gz, $(addprefix trim/, $(bname))) \
@@ -81,10 +84,28 @@ cleanall4rerun:
 ## get initial read stats                            ##
 #######################################################
 
-#run fastqc on downloaded sequences
+#run fastqc on sequences
 rawData/fastQC/%_fastqc.html: rawData/%.fastq.gz
 	mkdir -p rawData/fastQC
 	fastqc $^ -o rawData/fastQC 
+
+
+#######################################################
+## trim adaptors with cutadapt                       ##
+#######################################################
+
+# use cutadapt to trim
+cutadapt/%_R1.fastq.gz cutadapt/%_R2.fastq.gz: rawData/%_R1.fastq.gz rawData/%_R2.fastq.gz
+	mkdir -p cutadapt
+	cutadapt -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC \
+		-A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT \
+		-o cutadapt/$*_R1.fastq.gz -p cutadapt/$*_R2.fastq.gz \
+		rawData/$*_R1.fastq.gz rawData/$*_R2.fastq.gz
+
+#redo fastQC on trimmed reads
+cutadapt/fastQC/%_fastqc.html: cutadapt/%.fastq.gz
+	mkdir -p cutadapt/fastQC
+	fastqc $^ -o cutadapt/fastQC 
 
 
 #######################################################
@@ -92,9 +113,9 @@ rawData/fastQC/%_fastqc.html: rawData/%.fastq.gz
 #######################################################
 
 # use trimmomatic to trim
-trim/%_forward_paired.fq.gz trim/%_forward_unpaired.fq.gz trim/%_reverse_paired.fq.gz trim/%_reverse_unpaired.fq.gz: rawData/%_R1.fastq.gz rawData/%_R2.fastq.gz
+trim/%_forward_paired.fq.gz trim/%_forward_unpaired.fq.gz trim/%_reverse_paired.fq.gz trim/%_reverse_unpaired.fq.gz: cutadapt/%_R1.fastq.gz cutadapt/%_R2.fastq.gz
 	mkdir -p trim
-	java -jar ${trimmomaticDIR}/trimmomatic-0.36.jar PE rawData/$*_R1.fastq.gz rawData/$*_R2.fastq.gz trim/$*_forward_paired.fq.gz trim/$*_forward_unpaired.fq.gz trim/$*_reverse_paired.fq.gz trim/$*_reverse_unpaired.fq.gz ILLUMINACLIP:${trimAdapterFile}:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36 2> trim/report_$*_trimmomatic.txt
+	java -jar ${trimmomaticDIR}/trimmomatic-0.36.jar PE cutadapt/$*_R1.fastq.gz cutadapt/$*_R2.fastq.gz trim/$*_forward_paired.fq.gz trim/$*_forward_unpaired.fq.gz trim/$*_reverse_paired.fq.gz trim/$*_reverse_unpaired.fq.gz ILLUMINACLIP:${trimAdapterFile}:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36 2> trim/report_$*_trimmomatic.txt
 
 # redo fastQC on trimmed reads	
 trim/fastQC/%_fastqc.html: trim/%.fq.gz
