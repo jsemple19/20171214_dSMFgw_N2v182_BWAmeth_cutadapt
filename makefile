@@ -6,12 +6,15 @@
 ########### VARIABLES #########
 ###############################
 
-genomefile:= ${HOME}/Documents/MeisterLab/GenomeVer/sequence/c_elegans.PRJNA13758.WS250.genomic.fa
-trimmomaticDIR := ${HOME}/Trimmomatic-0.36
-trimAdapterFile := ${trimmomaticDIR}/adapters/TruSeq_2-3_PE.fa
+PICARD:=/software/UHTS/Analysis/picard-tools/2.9.0/bin/picard.jar
+BWAMETH:=${HOME}/mySoftware/bwa-meth-master/bwameth.py
+genomefile:=/home/jsemple/publicData/genomeVer/sequence/c_elegans.PRJNA13758.WS250.genomic.fa
+trimmomaticDIR := /software/UHTS/Analysis/trimmomatic/0.36
+trimAdapterFile := ${HOME}/TruSeq_2-3_PE.fa
 methIndGenomeFiles := $(addsuffix ${genomefile}.bwameth.ct2, .sa .amb .ann .pac .bwt)
-bname :=  $(addprefix 180126_SNK268_A_L001_JIB-, 1 2 3 4)
+#bname :=  $(addprefix 180126_SNK268_A_L001_JIB-, 1 2 3 4)
 longbname := $(addsuffix _R1, $(bname)) $(addsuffix _R2, $(bname))
+PRESEQ:=${HOME}/mySoftware/preseq
 
 #fileList=( $(cat fileList.txt) )
 
@@ -58,11 +61,6 @@ secondaryFiles :=   $(addsuffix .sorted.bam, $(addprefix aln/, $(bname)))
 ###############################
 
 all:  $(objects) $(statsObjects) $(secondaryFiles)
-
-#use cleanall when you want to force rerunning all the analysis
-cleanall:
-	rm -f $(intermediateFiles)
-	rm -f $(secondaryFiles)
 	
 #use clean if the intermediate files are not properly removed (should not be required)
 clean:
@@ -73,7 +71,11 @@ cleanall4rerun:
 	rm -f $(statsObjects)
 	rm -f $(secondaryFiles)
 
-.PHONY: all clean cleanall cleannall4rerun
+clean4storage:
+	rm -f $(intermediateFiles)
+	rm -f $(secondaryFiles)
+
+.PHONY: all clean cleannall4rerun clean4storage
 .INTERMEDIATE: $(intermediateFiles)
 .SECONDARY: $(secondaryFiles)
 
@@ -115,7 +117,7 @@ cutadapt/fastQC/%_fastqc.html: cutadapt/%.fastq.gz
 # use trimmomatic to trim
 trim/%_forward_paired.fq.gz trim/%_forward_unpaired.fq.gz trim/%_reverse_paired.fq.gz trim/%_reverse_unpaired.fq.gz: cutadapt/%_R1.fastq.gz cutadapt/%_R2.fastq.gz
 	mkdir -p trim
-	java -jar ${trimmomaticDIR}/trimmomatic-0.36.jar PE cutadapt/$*_R1.fastq.gz cutadapt/$*_R2.fastq.gz trim/$*_forward_paired.fq.gz trim/$*_forward_unpaired.fq.gz trim/$*_reverse_paired.fq.gz trim/$*_reverse_unpaired.fq.gz ILLUMINACLIP:${trimAdapterFile}:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36 2> trim/report_$*_trimmomatic.txt
+	trimmomatic PE cutadapt/$*_R1.fastq.gz cutadapt/$*_R2.fastq.gz trim/$*_forward_paired.fq.gz trim/$*_forward_unpaired.fq.gz trim/$*_reverse_paired.fq.gz trim/$*_reverse_unpaired.fq.gz ILLUMINACLIP:${trimAdapterFile}:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36 2> trim/report_$*_trimmomatic.txt
 
 # redo fastQC on trimmed reads	
 trim/fastQC/%_fastqc.html: trim/%.fq.gz
@@ -129,18 +131,18 @@ trim/fastQC/%_fastqc.html: trim/%.fq.gz
 	
 # convert and index genome file for bwameth alignment
 ${methIndGenomeFiles}: ${genomefile}	
-	bwameth.py index ${genomefile}
+	${BWAMETH} index ${genomefile}
 
 # align sequences to meth converted genome with bwameth
 aln/%.sam: trim/%_forward_paired.fq.gz trim/%_reverse_paired.fq.gz ${methIndGenomeFiles}
 	mkdir -p aln
-	bwameth.py --threads 3 --reference ${genomefile} trim/$*_forward_paired.fq.gz trim/$*_reverse_paired.fq.gz > aln/$*.sam
+	${BWAMETH} --threads 3 --reference ${genomefile} trim/$*_forward_paired.fq.gz trim/$*_reverse_paired.fq.gz > aln/$*.sam
 
 
 # use samtools to convert to bam and sort
 aln/%.sorted.bam: aln/%.sam
 	samtools view -u $^ | samtools sort -o $@
-
+	rm $^
 
 #######################################################
 ## Get alignment stats                               ##
@@ -158,11 +160,11 @@ aln/prefilt/report_%_stats.txt: aln/%.sorted.bam
 
 # Get insert size statistics and plots with picard and qualimap (set path to $QUALIMAP in .bash_profile)
 aln/prefilt/report_%_picard_insert_size_metrics.txt aln/prefilt/report_%_picard_insert_size_histogram.pdf \
-	aln/prefilt/report_%_qualimap.pdf: aln/%.sorted.bam ${PICARD} ${QUALIMAP}
+	aln/prefilt/report_%_qualimap.pdf: aln/%.sorted.bam 
 	java -Xms1g -Xmx5g -jar ${PICARD} CollectInsertSizeMetrics I=aln/$*.sorted.bam \
 	O=aln/prefilt/$*_picard_insert_size_metrics.txt \
     H=aln/prefilt/$*_picard_insert_size_histogram.pdf
-	${QUALIMAP} bamqc -bam aln/$*.sorted.bam -c -outdir aln/prefilt -outfile $*_report_qualimap.pdf -outformat PDF
+	qualimap bamqc -bam aln/$*.sorted.bam -c -outdir aln/prefilt -outfile $*_report_qualimap.pdf -outformat PDF
 
 
 #######################################################
@@ -193,8 +195,42 @@ aln/postfilt/report_%_stats.txt: aln/%.filt.bam
 
 # Get insert size statistics and plots with picard and qualimap post-filtering
 aln/postfilt/report_%_picard_insert_size_metrics.txt aln/postfilt/report_%_picard_insert_size_histogram.pdf \
-	aln/postfilt/report_%_qualimap.pdf: aln/%.filt.bam ${PICARD} ${QUALIMAP}
+	aln/postfilt/report_%_qualimap.pdf: aln/%.filt.bam
 	java -Xms1g -Xmx5g -jar ${PICARD} CollectInsertSizeMetrics I=aln/$*.filt.bam \
-	O=aln/postfilt/$*_picard_insert_size_metrics.txt \
-    H=aln/postfilt/$*_picard_insert_size_histogram.pdf
-	${QUALIMAP} bamqc -bam aln/$*.filt.bam -c -outdir aln/postfilt -outfile $*_report_qualimap.pdf -outformat PDF
+	O=aln/postfilt/$*_picard_insert_size_metrics.txt H=aln/postfilt/$*_picard_insert_size_histogram.pdf
+	qualimap bamqc -bam aln/$*.filt.bam -c -outdir aln/postfilt -outfile $*_report_qualimap.pdf -outformat PDF
+
+
+#######################################################
+## get median coverage                                  ##
+#######################################################
+
+aln/postfilt/%_depthCol.txt: aln/%.filt.bam
+	samtools depth -a $^ | cut -f3  > $@
+
+aln/postfilt/%_depthStats.txt: aln/postfilt/%_depthCol.txt
+	echo "min\tmax\tmedian\tmean" > $@
+	./R/mmmm.r < $^ >> $@
+
+
+
+#######################################################
+## predict unique seqs with greater seq depth          ##
+####################################################### 
+
+#convert to bed
+bed/%_sort.bed: aln/%.filt.bam
+	mkdir -p bed
+	bedtools bamtobed -i $^ | sort -k 1,1 -k 2,2n -k 3,3n -k 6,6 > $@
+
+
+#preform predictions
+plots/moreSeqProj_%.pdf: bed/%_sort.bed
+	mkdir -p bed/preseq
+	mkdir -p plots
+	${PRESEQ}/preseq c_curve -o bed/preseq/c_curve_output_$*.txt bed/$*_sort.bed
+	${PRESEQ}/preseq lc_extrap -o bed/preseq/lc_extrap_output_$*.txt bed/$*_sort.bed
+	${PRESEQ}/preseq bound_pop -o bed/preseq/bound_pop_output_$*.txt bed/$*_sort.bed
+	wc -l bed/$*_sort.bed >> bed/preseq/readCounts_$*.txt
+	Rscript R/sequenceMore.R $* ${PWD}/bed/preseq
+
