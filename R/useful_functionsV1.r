@@ -1,6 +1,6 @@
-library('BSgenome')
-library('BSgenome.Celegans.UCSC.ce11')
-library("BSgenome.Ecoli.NCBI.20080805")
+#library('BSgenome')
+#library('BSgenome.Celegans.UCSC.ce11')
+#Çlibrary("BSgenome.Ecoli.NCBI.20080805")
 library(Rsamtools)
 library(RColorBrewer)
 
@@ -232,7 +232,7 @@ tileCounts=function(regions,reads,wind,st){
    nbg=((bgr+pc)/(Tbg/1e6))
    nfg/nbg
     }
-require(AmpliconBiSeq)
+#require(AmpliconBiSeq)
 require(QuasR)
 require(data.table)
 #' get C methylation matrix for a given amplicon

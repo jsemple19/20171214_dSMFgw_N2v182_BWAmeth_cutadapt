@@ -206,17 +206,16 @@ getGCMatrix<-function(matC=matC.list[[1]],chr="chr2L",genome=Celegans,conv.rate=
 	list(matGC=matGC,matCG=matCG)
 }
 
-
 miObj2gr<-function(miObj) {
-  #function to convert Mindex object (obtained from applying GR on DNAstringset) to genomic ranges
-  allGR<-GRanges()
-  seqlevels(allGR)<-names(miObj)
-  for (n in names(miObj)) {
-    grObj<-GRanges(seqnames=Rle(c(n),length(miObj[[n]])),
-                   ranges=miObj[[n]], strand="*")
-    allGR<-append(allGR,grObj)
-  }
-  return(allGR)
+#function to convert Mindex object (obtained from applying GR on DNAstringset) to genomic ranges
+	allGR<-GRanges()
+	seqlevels(allGR)<-names(miObj)
+	for (n in names(miObj)) {
+		grObj<-GRanges(seqnames=Rle(c(n),length(miObj[[n]])),
+			ranges=miObj[[n]], strand="*")
+		allGR<-append(allGR,grObj)
+	}
+	return(allGR)
 }
 
 
@@ -224,124 +223,122 @@ call_context_methylation=function(meth_gr,cO,genome=Celegans){
   #call_context_methylation returns list of two GRanges objects "CG" and "GC"
   # in each of these , the V1 column contains fraction methylation
   # rather than counts and 'type' column with C context
-  if (class(genome)=="BSgenome"){
-    fastaFlag=FALSE
-  } else if (is.character(genome)){
-    genome<-readDNAStringSet(genome)
-    fastaFlag=TRUE
-  } else {
-    print("genome must be BSgenome of path to fasta file")
-  }
-  genome_CGs <- vmatchPattern("CG",genome)
-  genome_GCs <- vmatchPattern("GC",genome)
+			if (class(genome)=="BSgenome"){
+				fastaFlag=FALSE
+			} else if (is.character(genome)){
+				genome<-readDNAStringSet(genome)
+				fastaFlag=TRUE
+			} else {
+				print("genome must be BSgenome of path to fasta file")
+			}		
+			genome_CGs <- vmatchPattern("CG",genome)
+			genome_GCs <- vmatchPattern("GC",genome)
 
-  if (fastaFlag==FALSE) {
-    #if the genome is a BSgenome object then you have to get rid
-    #of duplicate matches on positive and negative strand
-    genome_CGs <- genome_CGs[strand(genome_CGs)=="+",]
-    strand(genome_CGs) <- "*"
+			if (fastaFlag==FALSE) {
+				#if the genome is a BSgenome object then you have to get rid
+				#of duplicate matches on positive and negative strand
+				genome_CGs <- genome_CGs[strand(genome_CGs)=="+",]
+				strand(genome_CGs) <- "*"
 
-    genome_GCs <- genome_GCs[strand(genome_GCs)=="+",]
-    strand(genome_GCs) <- "*"
-  } else {
-    # if the genome if fasta file, we need to convert Mindex object
-    #  to GRanges object
-    genome_CGs<-miObj2gr(genome_CGs)
-    genome_GCs<-miObj2gr(genome_GCs)
-  }
+				genome_GCs <- genome_GCs[strand(genome_GCs)=="+",]
+				strand(genome_GCs) <- "*"
+			} else {
+				# if the genome if fasta file, we need to convert Mindex object
+				#  to GRanges object
+				genome_CGs<-miObj2gr(genome_CGs)
+				genome_GCs<-miObj2gr(genome_GCs)
+			}
 
-  sel_CGs <- meth_gr %over% genome_CGs
-  sel_GCs <- meth_gr %over% genome_GCs
+			sel_CGs <- meth_gr %over% genome_CGs
+			sel_GCs <- meth_gr %over% genome_GCs
 
-  meth_CGs_gr <- meth_gr[sel_CGs]
-  meth_GCs_gr <- meth_gr[sel_GCs]
+			meth_CGs_gr <- meth_gr[sel_CGs]
+			meth_GCs_gr <- meth_gr[sel_GCs]
 
-  #### check arrays have even number of rows and if not,
-  #### add emptry row to avoid error when adding matrices
-  if(length(meth_CGs_gr)%%2==1) {
-    lastRange<-meth_CGs_gr[length(meth_CGs_gr)]
-    emptyRange<-lastRange
-    mcols(emptyRange)<-matrix(rep(0,length(mcols(emptyRange))),nrow=1)
-    colnames(mcols(emptyRange))<-colnames(mcols(lastRange))
-    meth_CGs_gr<-c(meth_CGs_gr,emptyRange)
-  }
-  if(length(meth_GCs_gr)%%2==1) {
-    lastRange<-meth_GCs_gr[length(meth_GCs_gr)]
-    emptyRange<-lastRange
-    mcols(emptyRange)<-matrix(rep(0,length(mcols(emptyRange))),nrow=1)
-    colnames(mcols(emptyRange))<-colnames(mcols(lastRange))
-    meth_GCs_gr<-c(meth_GCs_gr,emptyRange)
-  }
+		#### check arrays have even number of rows and if not,
+		#### add emptry row to avoid error when adding matrices
+			if(length(meth_CGs_gr)%%2==1) {
+			   lastRange<-meth_CGs_gr[length(meth_CGs_gr)]
+			   emptyRange<-lastRange
+			   mcols(emptyRange)<-matrix(rep(0,length(mcols(emptyRange))),nrow=1)
+			   colnames(mcols(emptyRange))<-colnames(mcols(lastRange))
+			   meth_CGs_gr<-c(meth_CGs_gr,emptyRange)
+			}
+			if(length(meth_GCs_gr)%%2==1) {
+			   lastRange<-meth_GCs_gr[length(meth_GCs_gr)]
+			   emptyRange<-lastRange
+			   mcols(emptyRange)<-matrix(rep(0,length(mcols(emptyRange))),nrow=1)
+			   colnames(mcols(emptyRange))<-colnames(mcols(lastRange))
+			   meth_GCs_gr<-c(meth_GCs_gr,emptyRange)
+			}
 
-  ##################
-  # collapse strands
-  ##################
-  meth_CGsCol_gr <- meth_CGs_gr[seq(1,length(meth_CGs_gr),by=2)]
-  end(meth_CGsCol_gr) <- end(meth_CGsCol_gr)+1
-  values(meth_CGsCol_gr) <- as.matrix(values(meth_CGs_gr[seq(1,length(meth_CGs_gr),by=2)]))+as.matrix(values(meth_CGs_gr[seq(2,length(meth_CGs_gr),by=2)]))
+		##################
+		# collapse strands
+		##################
+			meth_CGsCol_gr <- meth_CGs_gr[seq(1,length(meth_CGs_gr),by=2)]
+			end(meth_CGsCol_gr) <- end(meth_CGsCol_gr)+1
+			values(meth_CGsCol_gr) <- as.matrix(values(meth_CGs_gr[seq(1,length(meth_CGs_gr),by=2)]))+as.matrix(values(meth_CGs_gr[seq(2,length(meth_CGs_gr),by=2)]))
 
-  meth_GCsCol_gr <- meth_GCs_gr[seq(2,length(meth_GCs_gr),by=2)]
-  start(meth_GCsCol_gr) <- start(meth_GCsCol_gr)-1
-  values(meth_GCsCol_gr) <- as.matrix(values(meth_GCs_gr[seq(1,length(meth_GCs_gr),by=2)]))+as.matrix(values(meth_GCs_gr[seq(2,length(meth_GCs_gr),by=2)]))
+			meth_GCsCol_gr <- meth_GCs_gr[seq(2,length(meth_GCs_gr),by=2)]
+			start(meth_GCsCol_gr) <- start(meth_GCsCol_gr)-1
+			values(meth_GCsCol_gr) <- as.matrix(values(meth_GCs_gr[seq(1,length(meth_GCs_gr),by=2)]))+as.matrix(values(meth_GCs_gr[seq(2,length(meth_GCs_gr),by=2)]))
 
-  #####################
-  #filter for coverage
-  ####################
-  Tcounts=grep('_T\\>',colnames(elementMetadata(meth_CGsCol_gr)))
-  Mcounts=grep('_M\\>',colnames(elementMetadata(meth_CGsCol_gr)))
+		#####################
+		#filter for coverage
+		####################
+			Tcounts=grep('_T\\>',colnames(elementMetadata(meth_CGsCol_gr)))
+			Mcounts=grep('_M\\>',colnames(elementMetadata(meth_CGsCol_gr)))
 
-  ######
-  #CGs
-  ######
+			######
+			#CGs
+			######
 
-  CG.met.mat=as.matrix(elementMetadata(meth_CGsCol_gr)[,Mcounts])/as.matrix(elementMetadata(meth_CGsCol_gr)[,Tcounts])
-  #filter for coverage
-  CovFilter=as.matrix(elementMetadata(meth_CGsCol_gr)[,Tcounts])>cO
-  for (i in sl(CG.met.mat[1,])){CG.met.mat[!CovFilter[,i],i]=NA}
-  #bind the GRanges with the scores
-  CG.met=meth_CGsCol_gr
-  elementMetadata(CG.met)=CG.met.mat
-
-
-  ######
-  #GCs
-  ######
-
-  GC.met.mat=as.matrix(elementMetadata(meth_GCsCol_gr)[,Mcounts])/as.matrix(elementMetadata(meth_GCsCol_gr)[,Tcounts])
-  #filter for coverage
-  CovFilter=as.matrix(elementMetadata(meth_GCsCol_gr)[,Tcounts])>cO
-  for (i in sl(GC.met.mat[1,])){GC.met.mat[!CovFilter[,i],i]=NA}
-  #bind the GRanges with the scores
-
-  GC.met=meth_GCsCol_gr
-  elementMetadata(GC.met)=GC.met.mat
-
-  ###########################
-  #create an unified object
-  ###########################
-  oGCG=as.matrix(findOverlaps(resize(GC.met,1,fix='end'),resize(CG.met,1,fix='start'),type='equal'))
-  GC.met$type='GCH'
-  CG.met$type='CGH'
-  GC.met$type[oGCG[,1]]='GCG'
-  CG.met$type[oGCG[,2]]='GCG'
-
-  # 	getSeq(Celegans,resize(head(GC.met[oGCG[,1]]),fix='center'))
-  # 	x=GC.met[oGCG[,1]]$OSC_SS_R2_M
-  # 	y=CG.met[oGCG[,2]]$OSC_SS_R2_M
-
-  #
-  # 	GCs=GC.met[!(sl( GC.met) %in% oGCG[,1])  ]
-  # 	GCs$type='GCH'
-  # 	CGs=CG.met[!(sl( CG.met) %in% oGCG[,2])  ]
-  # 	CGs$type='HCG'
-  # 	GCGs=GC.met[( oGCG[,1])  ]
-  # 	GCGs$type='GCG'
-  umet=list(CG.met,GC.met)
-  names(umet)=c('CG','GC')
-  return(umet)
-}
+			CG.met.mat=as.matrix(elementMetadata(meth_CGsCol_gr)[,Mcounts])/as.matrix(elementMetadata(meth_CGsCol_gr)[,Tcounts])
+			#filter for coverage
+			CovFilter=as.matrix(elementMetadata(meth_CGsCol_gr)[,Tcounts])>cO
+			for (i in sl(CG.met.mat[1,])){CG.met.mat[!CovFilter[,i],i]=NA}
+				#bind the GRanges with the scores
+			CG.met=meth_CGsCol_gr
+			elementMetadata(CG.met)=CG.met.mat
 
 
+			######
+			#GCs
+			######
+
+			GC.met.mat=as.matrix(elementMetadata(meth_GCsCol_gr)[,Mcounts])/as.matrix(elementMetadata(meth_GCsCol_gr)[,Tcounts])
+			#filter for coverage
+			CovFilter=as.matrix(elementMetadata(meth_GCsCol_gr)[,Tcounts])>cO
+			for (i in sl(GC.met.mat[1,])){GC.met.mat[!CovFilter[,i],i]=NA}
+			#bind the GRanges with the scores
+
+			GC.met=meth_GCsCol_gr
+			elementMetadata(GC.met)=GC.met.mat
+
+			###########################
+			#create an unified object
+			###########################
+			oGCG=as.matrix(findOverlaps(resize(GC.met,1,fix='end'),resize(CG.met,1,fix='start'),type='equal'))
+			GC.met$type='GCH'
+			CG.met$type='CGH'
+			GC.met$type[oGCG[,1]]='GCG'
+			CG.met$type[oGCG[,2]]='GCG'
+
+		# 	getSeq(Celegans,resize(head(GC.met[oGCG[,1]]),fix='center'))
+		# 	x=GC.met[oGCG[,1]]$OSC_SS_R2_M
+		# 	y=CG.met[oGCG[,2]]$OSC_SS_R2_M
+
+		#
+		# 	GCs=GC.met[!(sl( GC.met) %in% oGCG[,1])  ]
+		# 	GCs$type='GCH'
+		# 	CGs=CG.met[!(sl( CG.met) %in% oGCG[,2])  ]
+		# 	CGs$type='HCG'
+		# 	GCGs=GC.met[( oGCG[,1])  ]
+		# 	GCGs$type='GCG'
+			umet=list(CG.met,GC.met)
+			names(umet)=c('CG','GC')
+			return(umet)
+		}
 
 
 # horizontalHeat function derived from AmpliconBiSeq package
@@ -440,7 +437,9 @@ horizontalHeat<-function(sim.mat,legend.width=1, legend=TRUE,legend.text="simila
 }
 
 
-# converts given matrix mat to selected color palette based on it is intensity
+
+
+
 convertToColors <- function(mat,col.select=colorRampPalette(c("blue", "yellow","red"))(50) ) {
    # Produce 'normalized' version of matrix, with values ranging from 0 to 1
    if(is.matrix(mat)){
