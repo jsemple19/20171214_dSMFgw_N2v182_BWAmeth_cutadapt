@@ -6,7 +6,11 @@ print(bname)
 myPath=args[2] #inside aln/ directory
 print(myPath)
 
-pdf(file=paste0(myPath,"/../plots/moreSeqProj_",bname,".pdf"),width=8,height=11,paper="a4")
+if (!dir.exists(paste0(myPath,"/../../plots"))) {
+  dir.create(paste0(myPath,"/../../plots"))
+}
+
+pdf(file=paste0(myPath,"/../../plots/moreSeqProj_",bname,".pdf"),width=8,height=11,paper="a4")
 par(mfrow=c(2,1))
 
 

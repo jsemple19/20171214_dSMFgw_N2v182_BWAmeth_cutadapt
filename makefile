@@ -12,6 +12,8 @@ trimAdapterFile := ${trimmomaticDIR}/adapters/TruSeq_2-3_PE.fa
 methIndGenomeFiles := $(addsuffix ${genomefile}.bwameth.ct2, .sa .amb .ann .pac .bwt)
 bname :=  $(addprefix 180126_SNK268_A_L001_JIB-, 1 2 3 4)
 longbname := $(addsuffix _R1, $(bname)) $(addsuffix _R2, $(bname))
+PRESEQ:=/Users/semple/mySoftware/preseq
+
 
 #fileList=( $(cat fileList.txt) )
 
@@ -38,7 +40,16 @@ statsObjects := $(addsuffix _fastqc.html, $(addprefix rawData/fastQC/, $(longbna
 	$(addprefix aln/postfilt/report_, $(addsuffix _flagstats.txt, $(bname))) \
 	$(addprefix aln/postfilt/report_, $(addsuffix _picard_insert_size_metrics.txt, $(bname))) \
 	$(addprefix aln/postfilt/report_, $(addsuffix _picard_insert_size_histogram.pdf, $(bname))) \
-	$(addprefix aln/postfilt/report_, $(addsuffix _qualimap.pdf, $(bname))) 
+	$(addprefix aln/postfilt/report_, $(addsuffix _qualimap.pdf, $(bname))) \
+	$(addprefix aln/postfilt/, $(addsuffix _depthStats.txt, $(bname))) \
+	$(addprefix plots/moreSeqProj_, $(addsuffix .pdf, $(bname))) 
+	
+	
+#	$(addprefix bed/preseq/readCounts_, $(addsuffix .txt, $(bname))) \
+#	$(addprefix bed/preseq/c_curve_output_, $(addsuffix .txt, $(bname))) \
+#	$(addprefix bed/preseq/lc_extrap_output_, $(addsuffix .txt, $(bname))) \	
+#	$(addprefix bed/preseq/bound_pop_output_, $(addsuffix .txt, $(bname))) \
+
 	
 #list of files to delete at the end of the analysis
 intermediateFiles := $(addsuffix .fastq.gz, $(addprefix cutadapt/, $(longbname))) \
@@ -47,7 +58,10 @@ intermediateFiles := $(addsuffix .fastq.gz, $(addprefix cutadapt/, $(longbname))
 	$(addsuffix _reverse_paired.fq.gz, $(addprefix trim/, $(bname))) \
 	$(addsuffix _reverse_unpaired.fq.gz, $(addprefix trim/, $(bname))) \
 	$(addsuffix .sam, $(addprefix aln/, $(bname))) \
-	$(addsuffix .dup.bam, $(addprefix aln/, $(bname)))	
+	$(addsuffix .dup.bam, $(addprefix aln/, $(bname))) \
+	$(addprefix aln/postfilt/, $(addsuffix _depthCol.txt, $(bname))) \
+	$(addprefix bed/, $(addsuffix _sort.bed, $(bname))) 
+	
 
 #list of secondary files to keep
 secondaryFiles :=   $(addsuffix .sorted.bam, $(addprefix aln/, $(bname)))
@@ -115,7 +129,7 @@ cutadapt/fastQC/%_fastqc.html: cutadapt/%.fastq.gz
 # use trimmomatic to trim
 trim/%_forward_paired.fq.gz trim/%_forward_unpaired.fq.gz trim/%_reverse_paired.fq.gz trim/%_reverse_unpaired.fq.gz: cutadapt/%_R1.fastq.gz cutadapt/%_R2.fastq.gz
 	mkdir -p trim
-	java -jar ${trimmomaticDIR}/trimmomatic-0.36.jar PE cutadapt/$*_R1.fastq.gz cutadapt/$*_R2.fastq.gz trim/$*_forward_paired.fq.gz trim/$*_forward_unpaired.fq.gz trim/$*_reverse_paired.fq.gz trim/$*_reverse_unpaired.fq.gz ILLUMINACLIP:${trimAdapterFile}:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36 2> trim/report_$*_trimmomatic.txt
+	java -jar ${trimmomaticDIR}/trimmomatic-0.36.jar PE cutadapt/$*_R1.fastq.gz cutadapt/$*_R2.fastq.gz trim/$*_forward_paired.fq.gz trim/$*_forward_unpaired.fq.gz trim/$*_reverse_paired.fq.gz trim/$*_reverse_unpaired.fq.gz ILLUMINACLIP:${trimAdapterFile}:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:50 2> trim/report_$*_trimmomatic.txt
 
 # redo fastQC on trimmed reads	
 trim/fastQC/%_fastqc.html: trim/%.fq.gz
@@ -140,6 +154,7 @@ aln/%.sam: trim/%_forward_paired.fq.gz trim/%_reverse_paired.fq.gz ${methIndGeno
 # use samtools to convert to bam and sort
 aln/%.sorted.bam: aln/%.sam
 	samtools view -u $^ | samtools sort -o $@
+	rm $^
 
 
 #######################################################
@@ -176,7 +191,8 @@ aln/%.dup.bam aln/postfilt/report_%_picard.txt: aln/%.sorted.bam ${PICARD}
 
 # 	remove mitochondrial reads
 aln/%.filt.bam: aln/%.dup.bam
-	samtools view -q 30 -F 1804 -b $^ > $@ 	
+	samtools view -q 30 -F 1804 -b $^ > $@
+	rm $^ 	
 # NOTE: sam flag 1804 means the following:
 # read unmapped
 # mate unmapped
@@ -198,3 +214,44 @@ aln/postfilt/report_%_picard_insert_size_metrics.txt aln/postfilt/report_%_picar
 	O=aln/postfilt/$*_picard_insert_size_metrics.txt \
     H=aln/postfilt/$*_picard_insert_size_histogram.pdf
 	${QUALIMAP} bamqc -bam aln/$*.filt.bam -c -outdir aln/postfilt -outfile $*_report_qualimap.pdf -outformat PDF
+
+
+
+#######################################################
+## get median coverage 						         ##
+#######################################################
+
+aln/postfilt/%_depthCol.txt: aln/%.filt.bam
+	samtools depth -a $^ | cut -f3  > $@
+
+aln/postfilt/%_depthStats.txt: aln/postfilt/%_depthCol.txt
+	echo "min\tmax\tmedian\tmean" > $@
+	./R/mmmm.r < $^ >> $@
+	#depthStats=`./R/mmmm.r < $^`
+	#echo ${depthStats}
+	#echo "${depthStats}" >> $@
+
+
+
+#######################################################
+## predict unique seqs with greater seq depth 	     ##
+####################################################### 
+
+#convert to bed
+bed/%_sort.bed: aln/%.filt.bam
+	mkdir -p bed
+	bedtools bamtobed -i $^ | sort -k 1,1 -k 2,2n -k 3,3n -k 6,6 > $@
+
+
+#preform predictions
+plots/moreSeqProj_%.pdf: bed/%_sort.bed
+	mkdir -p bed/preseq
+	mkdir -p plots
+	${PRESEQ}/preseq c_curve -o bed/preseq/c_curve_output_$*.txt bed/$*_sort.bed
+	#${PRESEQ}/preseq lc_extrap -o bed/preseq/lc_extrap_output_$*.txt bed/$*_sort.bed
+	#${PRESEQ}/preseq bound_pop -o bed/preseq/bound_pop_output_$*.txt bed/$*_sort.bed
+	wc -l bed/$*_sort.bed >> bed/preseq/readCounts_$*.txt
+	#Rscript R/sequenceMore.R $* $PWD/bed/preseq
+	touch plots/moreSeqProj_$*.pdf
+
+
