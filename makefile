@@ -41,7 +41,9 @@ statsObjects := $(addsuffix _fastqc.html, $(addprefix rawData/fastQC/, $(longbna
 	$(addprefix aln/postfilt/report_, $(addsuffix _flagstats.txt, $(bname))) \
 	$(addprefix aln/postfilt/report_, $(addsuffix _picard_insert_size_metrics.txt, $(bname))) \
 	$(addprefix aln/postfilt/report_, $(addsuffix _picard_insert_size_histogram.pdf, $(bname))) \
-	$(addprefix aln/postfilt/report_, $(addsuffix _qualimap.pdf, $(bname))) 
+	$(addprefix aln/postfilt/report_, $(addsuffix _qualimap.pdf, $(bname))) \
+	$(addprefix aln/postfilt/, $(addsuffix _depthStats.txt, $(bname))) \
+	$(addprefix plots/moreSeqProj_, $(addsuffix .pdf, $(bname))) 
 	
 #list of files to delete at the end of the analysis
 intermediateFiles := $(addsuffix .fastq.gz, $(addprefix cutadapt/, $(longbname))) \
@@ -50,7 +52,9 @@ intermediateFiles := $(addsuffix .fastq.gz, $(addprefix cutadapt/, $(longbname))
 	$(addsuffix _reverse_paired.fq.gz, $(addprefix trim/, $(bname))) \
 	$(addsuffix _reverse_unpaired.fq.gz, $(addprefix trim/, $(bname))) \
 	$(addsuffix .sam, $(addprefix aln/, $(bname))) \
-	$(addsuffix .dup.bam, $(addprefix aln/, $(bname)))	
+	$(addsuffix .dup.bam, $(addprefix aln/, $(bname))) \
+	$(addprefix aln/postfilt/, $(addsuffix _depthCol.txt, $(bname))) \
+	$(addprefix bed/, $(addsuffix _sort.bed, $(bname))) 	
 
 #list of secondary files to keep
 secondaryFiles :=   $(addsuffix .sorted.bam, $(addprefix aln/, $(bname)))
@@ -161,10 +165,10 @@ aln/prefilt/report_%_stats.txt: aln/%.sorted.bam
 # Get insert size statistics and plots with picard and qualimap (set path to $QUALIMAP in .bash_profile)
 aln/prefilt/report_%_picard_insert_size_metrics.txt aln/prefilt/report_%_picard_insert_size_histogram.pdf \
 	aln/prefilt/report_%_qualimap.pdf: aln/%.sorted.bam 
-	java -Xms1g -Xmx5g -jar ${PICARD} CollectInsertSizeMetrics I=aln/$*.sorted.bam \
+	java -Xms1g -Xmx16g -jar ${PICARD} CollectInsertSizeMetrics I=aln/$*.sorted.bam \
 	O=aln/prefilt/$*_picard_insert_size_metrics.txt \
     H=aln/prefilt/$*_picard_insert_size_histogram.pdf
-	qualimap bamqc -bam aln/$*.sorted.bam -c -outdir aln/prefilt -outfile $*_report_qualimap.pdf -outformat PDF
+	qualimap bamqc --java-mem-size=16G -bam aln/$*.sorted.bam -c -outdir aln/prefilt -outfile $*_report_qualimap.pdf -outformat PDF
 
 
 #######################################################
@@ -196,9 +200,9 @@ aln/postfilt/report_%_stats.txt: aln/%.filt.bam
 # Get insert size statistics and plots with picard and qualimap post-filtering
 aln/postfilt/report_%_picard_insert_size_metrics.txt aln/postfilt/report_%_picard_insert_size_histogram.pdf \
 	aln/postfilt/report_%_qualimap.pdf: aln/%.filt.bam
-	java -Xms1g -Xmx5g -jar ${PICARD} CollectInsertSizeMetrics I=aln/$*.filt.bam \
+	java -Xms1g -Xmx16g -jar ${PICARD} CollectInsertSizeMetrics I=aln/$*.filt.bam \
 	O=aln/postfilt/$*_picard_insert_size_metrics.txt H=aln/postfilt/$*_picard_insert_size_histogram.pdf
-	qualimap bamqc -bam aln/$*.filt.bam -c -outdir aln/postfilt -outfile $*_report_qualimap.pdf -outformat PDF
+	qualimap bamqc --java-mem-size=16G -bam aln/$*.filt.bam -c -outdir aln/postfilt -outfile $*_report_qualimap.pdf -outformat PDF
 
 
 #######################################################
@@ -211,7 +215,6 @@ aln/postfilt/%_depthCol.txt: aln/%.filt.bam
 aln/postfilt/%_depthStats.txt: aln/postfilt/%_depthCol.txt
 	echo "min\tmax\tmedian\tmean" > $@
 	./R/mmmm.r < $^ >> $@
-
 
 
 #######################################################

@@ -8,8 +8,8 @@
 #BSUB -N
 ##BSUB -n 4
 ##BSUB -R "span[ptile=4]"
-#BSUB –R "rusage[mem=8192]" ## in Mb
-#BSUB -M 8388608 ## in kb
+#BSUB –R "rusage[mem=16000]" ## in Mb
+#BSUB -M 16000000 ## in kb
 #BSUB -J array[1]
 
 
