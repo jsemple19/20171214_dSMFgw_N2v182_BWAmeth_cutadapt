@@ -13,11 +13,8 @@ seqnames(Celegans)<-gsub("M", "MtDNA", seqnames(Celegans))
 # also read is location of genome fasta file for QuasR objects
 genomeFile<-"~/Documents/MeisterLab/GenomeVer/sequence/c_elegans.PRJNA13758.WS250.genomic.fa"
 
-# collect citations for packages used
-packageBib<-toBibtex(c(citation("QuasR"),
-                       citation("BSgenome.Celegans.UCSC.ce11")))
 
-setwd("~/Documents/MeisterLab/sequencingData/20171214_dSMFgw_N2v182_BWAmeth")
+setwd("~/Documents/MeisterLab/sequencingData/20171214_dSMFgw_N2v182_BWAmeth_cutadapt")
 source('./R/callAllCs.r') #to call all Cs
 source('./R/useful_functionsV1.r') #load the ranges
 
@@ -38,7 +35,7 @@ NOMEproj=qAlign(sampleFile='./QuasR_Aligned.txt',
               genome=genomeFile,
               paired="fr",
               bisulfite="dir",
-              projectName="dSMF_N2",
+              projectName="dSMF_N2vF2",
               clObj=cluObj)
 
 
@@ -50,18 +47,23 @@ meth_gr=qMeth(NOMEproj, mode='allC',clObj=cluObj)
 # 35541247
 #todayDate<-format(Sys.time(), "%Y%m%d")
 
-if (!dir.exists(paste0(path,"./methylation_calls"))){
-  dir.create(paste0(path,"./methylation_calls"))
+if (!dir.exists(paste0(path,"/methylation_calls"))){
+  dir.create(paste0(path,"/methylation_calls"))
 }
-if (!dir.exists(paste0(path,"./plots"))){
-  dir.create(paste0(path,"./plots"))
+if (!dir.exists(paste0(path,"/plots"))){
+  dir.create(paste0(path,"/plots"))
+}
+if (!dir.exists(paste0(path,"/docs"))){
+  dir.create(paste0(path,"/docs"))
 }
 
 ## save as rds for future access
 saveRDS(meth_gr,paste0(path,'/methylation_calls/NOME_allCs.rds'))
 
+#meth_gr<-readRDS(paste0(path,'/fromCluster/methylation_calls/NOME_allC.rds'))
+
 # and make some histograms
-pdf("./plots/hist_C_coverage.pdf",width=8,height=11,paper="a4")
+pdf(paste0(path,"/plots/hist_C_coverage.pdf"),width=8,height=11,paper="a4")
 par(mfrow=c(2,1))
 for (s in samples) {
   columnTotal<-paste0(s,"_T")
@@ -73,6 +75,23 @@ for (s in samples) {
 }
 dev.off()
 
+# not excluding 0s
+Ccoverage<-data.frame(sampleNames=samples,Cs0freq=0,meanCoverage=0,medianCoverage=0,stdevCoverage=0,
+                      meanMethCount=0,medianMethCount=0,stdevMethCount=0)
+
+for (s in samples) {
+  columnTotal<-paste0(s,"_T")
+  columnMeth<-paste0(s,"_M")
+  Ccoverage[Ccoverage$sampleNames==s,"Cs0freq"]<-sum(mcols(meth_gr)[,columnTotal]==0)/length(mcols(meth_gr)[,columnTotal])
+  Ccoverage[Ccoverage$sampleNames==s,"meanCoverage"]<-mean(mcols(meth_gr)[,columnTotal])
+  Ccoverage[Ccoverage$sampleNames==s,"medianCoverage"]<-median(mcols(meth_gr)[,columnTotal])
+  Ccoverage[Ccoverage$sampleNames==s,"stdevCoverage"]<-sd(mcols(meth_gr)[,columnTotal])
+  Ccoverage[Ccoverage$sampleNames==s,"meanMethCount"]<-mean(mcols(meth_gr)[,columnMeth])
+  Ccoverage[Ccoverage$sampleNames==s,"medianMethCount"]<-median(mcols(meth_gr)[,columnMeth])
+  Ccoverage[Ccoverage$sampleNames==s,"stdevMethCount"]<-sd(mcols(meth_gr)[,columnMeth])
+}
+
+write.csv(Ccoverage, file=paste0(path,"/docs/CytosineCoverage.csv"))
 
 # find sequence context of Cs using function from callAllCs.r file
 cO=10 # minimal read coverage for a C (low coverage discarded)
@@ -80,7 +99,7 @@ methFreq_grl=call_context_methylation(meth_gr,cO,genome=Celegans)
 
 # call_context_methylation returns list of two matrices, "CG" and "GC" in which
 # V1 column with fraction methylation and type column with C context
-pdf("./plots/hist_CG-GC_freq.pdf",width=8,height=11,paper="a4")
+pdf(paste0(path,"/plots/hist_CG-GC_freq.pdf"),width=8,height=11,paper="a4")
 par(mfrow=c(2,1))
 for (s in samples){
   columnMeth<-paste0(s,"_M")
